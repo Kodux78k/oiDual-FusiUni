@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>dual.Infodose — Fusion Unificado (Chat Cinematográfico + Fusion HUD)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#05070a">
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@200;400;600;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+  <!-- External Libraries (CDN) -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+
+  <style>
+    /* ====== Combined variables & base ====== */
+    :root{
+      /* Chat app vars */
+      --bg-dark: linear-gradient(to bottom,#000,#1a1a1a);
+      --text-dark:#fff; --primary:#111; --secondary:#5e5c5e;
+      --accent:#0ff; --fast:0.4s; --med:0.8s; --slow:1.8s;
+      /* Fusion vars */
+      --bg-deep:#030406; --glass-surface:rgba(18,18,22,0.65); --glass-border:rgba(255,255,255,0.06);
+      --neon-cyan:#00f2ff; --neon-purple:#bd00ff; --neon-gold:#ffd700; --neon-danger:#ff2a6d; --neon-success:#00ff9d;
+      --font-ui:'Montserrat',sans-serif; --font-code:'JetBrains Mono',monospace;
+      --ease-overshoot: cubic-bezier(0.34, 1.3, 0.64, 1);
+      --ease-smooth: cubic-bezier(0.23, 1, 0.32, 1);
+    }
+
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;outline:none;user-select:none}
+    html,body{height:100%;min-height:100vh}
+    body{
+      font-family:var(--font-ui); color:var(--text-dark);
+      background: var(--bg-dark);
+      background-image:
+        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size:50px 50px;
+      padding:20px; overflow:hidden; display:flex; flex-direction:column; align-items:center;
+    }
+
+    /* ====== Particles / Ambient ====== */
+    #particles-js{position:absolute;inset:0;z-index:0;pointer-events:none}
+    .ambient-light{position:fixed;inset:0;z-index:0;pointer-events:none}
+    .blob{position:absolute;border-radius:50%;filter:blur(100px);opacity:0.14;animation:float 25s infinite alternate ease-in-out}
+    .blob-1{width:60vw;height:60vw;background:var(--neon-cyan);top:-20%;left:-20%}
+    .blob-2{width:50vw;height:50vw;background:var(--neon-purple);bottom:-20%;right:-20%;animation-delay:-5s}
+    @keyframes float{0%{transform:translate(0,0)}100%{transform:translate(40px,60px)}}
+
+    /* ====== Chat Cinematográfico styles ====== */
+    .svg-container{
+        position:absolute;top:35%;left:50%;transform:translate(-50%,-50%);
+        width:160px;height:160px;z-index:1;
+        display: flex; justify-content: center; align-items: center;
+        opacity: 0.8;
+    }
+    .svg-container object{width:100%;height:100%}
+
+    .top-info {
+      position: fixed; top: 18px; left: 20px; z-index: 5;
+      background: rgba(0,0,0,0.35); padding: 8px 12px; border-radius: 12px; font-size: 0.9em;
+      backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.05);
+    }
+    .response-container{
+      position:fixed; left:20px; right:20px; bottom:160px;
+      padding:12px;background:rgba(0,0,0,0.4);backdrop-filter:blur(10px);
+      border-radius:20px; max-height:calc(100vh - 220px); overflow-y:auto; -webkit-overflow-scrolling:touch; z-index:4;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    .page{display:none; opacity:0; transition:opacity var(--med) ease-in-out}
+    .page.active{display:block; opacity:1}
+    .page.initial{text-align:center;font-size:1.1em; color: rgba(255,255,255,0.8);}
+
+    .response-controls{display:flex;justify-content:space-between;align-items:center;margin-top:15px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.2)}
+    .control-buttons{display:flex;gap:10px;align-items:center}
+    .control-btn{background:rgba(255,255,255,0.05);padding:6px;border-radius:6px;cursor:pointer;transition:background var(--fast);display:flex;gap:6px;border:none;outline:none; color: #fff;}
+    .control-btn:hover{background:rgba(255,255,255,0.12)}
+    .control-btn svg { stroke: currentColor; fill: none; }
+    .toggle-button.active{color:#0f0}
+
+    .pagination{display:flex;align-items:center;gap:10px}
+    .pagination button{background:none;border:none;font-size:1.2em;color:#6fe4fb;cursor:pointer;transition:transform var(--fast)}
+    .pagination button:hover{transform:scale(1.2)}
+
+    .response-block{
+      margin:1rem 0;padding:1.2rem;border-radius:12px;
+      animation:fadeIn var(--slow) ease forwards; transition:box-shadow var(--fast),transform var(--fast);
+      line-height:1.5;position:relative;cursor:pointer;overflow:hidden;animation:pulse 6s infinite ease-in-out;
+      background: linear-gradient(135deg, rgba(255,255,255,0.02), rgba(0,0,0,0.25));
+      border: 1px solid rgba(255,255,255,0.03);
+    }
+    .response-block h3{margin-bottom:12px; color: var(--accent);}
+    .response-block:hover{box-shadow:0 0 15px rgba(0,255,255,0.12)}
+    .response-block .meta { position:absolute; top:8px; right:8px; display:flex; gap:6px; }
+    .crystal-btn { background: rgba(0,0,0,0.25); border-radius:6px; padding:6px; cursor:pointer; border:none; color:var(--accent); }
+    .response-block.clicked{animation:clickPulse var(--med) ease-out}
+    .response-block.expanded{transform:scale(1.03); background:rgba(0,0,0,0.6); z-index:6}
+    .intro{background:linear-gradient(135deg,rgba(0,255,255,0.08),rgba(0,100,100,0.04));border-left:4px solid #0ff}
+    .middle{background:linear-gradient(135deg,rgba(255,255,255,0.02),rgba(50,50,50,0.06));border-left:4px solid rgba(255,255,255,0.2)}
+    .ending{background:linear-gradient(135deg,rgba(255,0,255,0.06),rgba(100,0,100,0.04));border-left:4px solid #f0f}
+    .footer-text{margin-top:12px;font-size:0.8em;text-align:center;font-style:italic; opacity: 0.7;}
+
+    .input-container{position:fixed;left:20px;right:20px;bottom:90px;display:flex;gap:10px;z-index:5;max-width:calc(100% - 40px)}
+    .input-container input{flex:1;padding:15px;border:none;border-radius:20px;background:rgba(255,255,255,0.1);color:inherit;outline:none;font-size:16px;transition:background var(--fast); backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.1);}
+    .input-container input:focus{background:rgba(255,255,255,0.2)}
+    .input-container button{width:54px;height:54px;border:none;border-radius:50%;background:linear-gradient(45deg,var(--primary),var(--secondary));color:#fff;font-size:1.5em;cursor:pointer;display:flex;justify-content:center;align-items:center;animation:pulse 2s infinite ease-in-out;transition:transform var(--fast); border: 1px solid rgba(255,255,255,0.2);}
+    .input-container button:hover{transform:scale(1.1)}
+
+    @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.02)}}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes clickPulse{0%,100%{opacity:1}50%{opacity:0.8}}
+
+    /* Settings + Toggle Panel + Crystal Modal */
+    .modal, .panel { position: fixed; inset: 0; display: none; z-index: 9998; justify-content:center; align-items:center; background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); }
+    .modal.active, .panel.active { display:flex }
+    .box {
+      background:#1a1a1a;padding:20px;border-radius:12px;border:1px solid rgba(255,255,255,0.06);
+      width:90%;max-width:520px;box-shadow:0 8px 40px rgba(0,0,0,0.6); color:#fff;
+    }
+    .box h3{color:var(--accent);margin-bottom:8px}
+    .row{display:flex;gap:10px;align-items:center}
+    .col{display:flex;flex-direction:column;gap:8px}
+    .input-group label{font-size:0.85em;color:#aaa;margin-left:4px}
+    .input-group input[type="text"], .input-group input[type="password"], .input-group input[type="file"]{
+      width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.08);background:rgba(0,0,0,0.5);color:#fff;outline:none;
+    }
+    .settings-actions{display:flex;gap:10px;margin-top:12px}
+    .btn{padding:10px;border-radius:8px;border:none;cursor:pointer;font-weight:600}
+    .btn-prim{background:var(--accent);color:#000}
+    .btn-sec{background:rgba(255,255,255,0.08);color:#fff}
+    .small {font-size:0.85em;color:#bbb}
+    .crystal-list { max-height:300px; overflow:auto; display:flex; flex-direction:column; gap:8px }
+    .crystal-item { background: rgba(255,255,255,0.02); padding:8px; border-radius:8px; display:flex; justify-content:space-between; gap:8px; align-items:flex-start }
+    .crystal-item .actions { display:flex; gap:6px }
+
+    /* Mantra footer */
+    #mantra-toggle {
+      position: fixed;
+      bottom: 25px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 5;
+      background: rgba(15, 15, 15, 0.7);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.06);
+      padding: 10px 24px;
+      border-radius: 100px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+      transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+      min-width: 280px;
+    }
+    #mantra-toggle.collapsed { background: transparent; border-color: rgba(255, 215, 0, 0.3); padding: 10px 40px; }
+    #mantra-text { font-style: italic; color: #777; font-size: 0.85rem; white-space: nowrap; transition: all 0.4s ease; }
+    .fade-out { opacity: 0; transform: translateY(-5px); }
+    .fade-in { opacity: 0; transform: translateY(5px); }
+
+    /* Hide UI on zen mode */
+    body.zen-mode .response-container,
+    body.zen-mode .input-container,
+    body.zen-mode .top-info,
+    body.zen-mode .svg-container {
+      opacity: 0; pointer-events: none; filter: blur(12px); transition: all 0.6s ease;
+    }
+
+    /* ====== Fusion HUD / Card styles ====== */
+    .container{
+      position: absolute; inset:0; pointer-events:none;
+      display:flex; align-items:center; justify-content:center; perspective:1200px; z-index:10;
+    }
+    .fusion-card{
+      pointer-events:auto;
+      width:100%; max-width:440px;
+      background:var(--glass-surface); backdrop-filter:blur(30px); -webkit-backdrop-filter:blur(30px);
+      border:1px solid var(--glass-border); border-radius:36px; padding:30px 25px;
+      box-shadow:0 40px 100px rgba(0,0,0,0.8);
+      position:relative; opacity:0; transform:translateY(50px) scale(0.96);
+      display:flex; flex-direction:column; gap:8px;
+      transition: width 0.5s var(--ease-smooth), height 0.5s var(--ease-smooth), border-radius 0.5s var(--ease-smooth), transform 0.4s var(--ease-smooth), opacity 0.4s;
+      will-change: transform, width, height, border-radius, left, top;
+      touch-action: none;
+      z-index:99999 !important;
+    }
+    .fusion-card.active{opacity:1;transform:translateY(0) scale(1);}
+
+    /* CORREÇÃO DO CARD "MINIFICADO" (CLOSED) */
+    .fusion-card.closed{width:260px; padding:14px 16px; border-radius:22px;}
+    .fusion-card.closed .card-body { display: none; } /* Remove espaço extra vertical */
+
+    .fusion-card.orb{ position: fixed !important; width: 68px !important; height: 68px !important; padding:0 !important; border-radius:50% !important; align-items:center; justify-content:center; box-shadow:0 15px 40px rgba(0,0,0,0.6), 0 0 20px rgba(0,242,255,0.2); z-index:9999; cursor:grab }
+    .fusion-card.hud{ position: fixed !important; top: 12px !important; left: 50% !important; transform: translateX(-50%) !important; width: 92% !important; max-width:600px !important; height:64px !important; padding:0 16px !important; border-radius:99px !important; flex-direction:row; align-items:center; justify-content:space-between; box-shadow:0 10px 30px rgba(0,0,0,0.5); z-index:9999; }
+
+    .card-header{display:flex;align-items:center;gap:15px;margin-bottom:18px; width:100%; cursor:pointer;}
+    .avatar-slot{width:64px;height:64px;border-radius:18px;overflow:hidden;opacity:0;transition:opacity 0.35s}
+    .avatar-slot.shown{opacity:1 !important;}
+
+    .text-block{flex:1;display:flex;flex-direction:column;justify-content:center}
+    .greeting-row{font-size:1.5rem;line-height:1;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+    .txt-thin{font-weight:200;color:rgba(255,255,255,0.7)}
+    .txt-heavy{font-weight:600;color:#fff; max-width: 220px; display:inline-block; vertical-align:middle; font-size:1.05rem;}
+
+    .brand-dual{font-size:2.2rem;font-weight:900;line-height:0.95;text-transform:uppercase;letter-spacing:-2px;margin-top:4px;background:linear-gradient(-45deg,#fff,var(--neon-cyan),var(--neon-purple),#fff);background-size:300%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:gradientFlow 4s ease infinite}
+    @keyframes gradientFlow{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+
+    .card-body{display:flex;flex-direction:column;gap:12px}
+    .stagger-item{opacity:0;transform:translateY(15px);transition:opacity 0.4s ease, transform 0.4s var(--ease-overshoot)}
+    .content-visible .stagger-item{opacity:1;transform:translateY(0)}
+
+    .cyber-input{width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:16px 50px 16px 18px;color:#fff;font-family:var(--font-code);font-size:0.9rem; outline: none;}
+    .activation-pre{font-family:var(--font-code);white-space:pre-wrap;margin:0;padding:8px;background:rgba(0,0,0,0.12);border-radius:8px;border:1px dashed rgba(255,255,255,0.03);color:#fff;font-size:0.75rem}
+
+    .small-preview{display:none;align-items:center;gap:10px;margin-top:8px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.03);font-family:var(--font-code);font-size:0.86rem;color:rgba(255,255,255,0.9);cursor:pointer;}
+    .small-preview .mini-avatar{width:30px;height:30px;border-radius:6px;flex-shrink:0;overflow:hidden;display:inline-flex;align-items:center;justify-content:center}
+    .small-preview .small-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:calc(100% - 110px)}
+    .small-preview .ident-badge{margin-left:auto;font-weight:700;font-size:0.78rem;padding:4px 8px;border-radius:999px;background:rgba(255,255,255,0.03);color:rgba(255,255,255,0.9);border:1px solid rgba(255,255,255,0.02)}
+
+    .trigger-btn{width:100%;padding:12px;border:1px dashed rgba(255,255,255,0.1);border-radius:12px;background:rgba(255,255,255,0.02);color:rgba(255,255,255,0.5);font-size:0.75rem;letter-spacing:2px;text-transform:uppercase;cursor:pointer;display:flex;justify-content:center;align-items:center;gap:8px}
+
+    /* Stats grid */
+    .stats-grid { display: flex; justify-content: space-between; margin-top: 10px; }
+    .stat-box { display: flex; flex-direction: column; align-items: center; }
+    .stat-lbl { font-size: 0.6rem; color: rgba(255,255,255,0.4); letter-spacing: 1px; }
+    .stat-val { font-size: 0.85rem; font-weight: 700; color: #fff; margin-top: 4px; }
+    .progress-container { width: 100%; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; position: relative; }
+    .bar-meta { display: flex; justify-content: space-between; font-size: 0.65rem; color: rgba(255,255,255,0.5); margin-bottom: 4px; }
+    .bar-fill { height: 100%; background: var(--neon-cyan); width: 0%; transition: width 1s linear; }
+
+    .toaster-wrap{position:fixed;right:20px;bottom:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+    .toaster{pointer-events:auto;background:linear-gradient(180deg,#0b1220,#071018);border:1px solid rgba(255,255,255,0.06);padding:10px 14px;border-radius:10px;box-shadow:0 18px 40px rgba(0,0,0,0.6);font-family:var(--font-ui);font-size:0.95rem;opacity:0;transform:translateY(8px);transition:all 260ms var(--ease-smooth); color: #fff;}
+    .toaster.show{opacity:1;transform:translateY(0)}
+    .toaster.error{border-color:var(--neon-danger);color:var(--neon-danger)}
+    .toaster.success{border-color:var(--neon-success);color:var(--neon-success)}
+
+    /* Keys modal */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.65);display:none;align-items:center;justify-content:center;z-index:99998;backdrop-filter:blur(8px)}
+    .keys-card{width:90%;max-width:760px;background:linear-gradient(180deg,#071018,#0b1220);border:1px solid rgba(255,255,255,0.08);padding:20px;border-radius:16px;color:var(--text);box-shadow:0 20px 50px rgba(0,0,0,0.8);max-height:90vh;display:flex;flex-direction:column}
+    .key-list{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-right:6px;min-height:100px; margin: 15px 0;}
+    .key-item{display:flex;align-items:center;gap:8px;padding:12px;border-radius:10px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.02); justify-content: space-between;}
+    .key-item.active-item{background:rgba(0, 242, 255, 0.05);border-color:rgba(0, 242, 255, 0.2)}
+    .small-btn{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);padding:6px 10px;border-radius:8px;color:#fff;cursor:pointer;font-size:0.75rem;text-transform:uppercase;font-weight:600;transition:0.2s}
+    .small-btn.active-btn{background:var(--neon-success);color:#000;border:none}
+    .small-btn.danger{ color: var(--neon-danger); border-color: rgba(255,42,109,0.3); }
+    .form-grid{display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;}
+    .form-row{display: flex; gap: 8px;}
+    .form-section input { width: 100%; padding: 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; outline: none; }
+
+    /* Activation Card */
+    .activation-hidden { display: none; }
+    .activation-open { display: block; animation: fadeIn 0.3s ease; }
+    .activation-toggle { cursor: pointer; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 12px; margin-bottom: 8px; display: flex; align-items: center; }
+    .activation-card { padding: 12px; background: rgba(0,0,0,0.2); border-radius: 12px; margin-top: 8px; }
+    .activation-controls { display: flex; gap: 8px; margin-top: 8px; }
+
+    /* Responsive */
+    @media (max-width:640px){
+      .box{max-width:92%}
+      .svg-container{width:120px;height:120px}
+      .form-grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ALERT OVERRIDE (For Preview Safety) -->
+  <script>
+    // Map default alert/confirm to safer implementations or console to prevent blocking
+    const originalAlert = window.alert;
+    window.alert = function(msg) {
+        if(typeof showToaster === 'function') {
+            showToaster(msg, 'default');
+        } else {
+            console.log("ALERT:", msg);
+            // Fallback simple UI
+            const d = document.createElement('div');
+            d.style.cssText = "position:fixed;top:20px;left:50%;transform:translateX(-50%);background:rgba(10,10,15,0.95);color:#fff;padding:12px 24px;border-radius:99px;z-index:999999;border:1px solid rgba(255,255,255,0.1);box-shadow:0 5px 20px rgba(0,0,0,0.5);font-family:sans-serif;font-size:0.9rem;pointer-events:none;animation:fadeIn 0.3s ease;";
+            d.textContent = msg;
+            document.body.appendChild(d);
+            setTimeout(()=> { d.style.opacity='0'; setTimeout(()=>d.remove(),300) }, 3000);
+        }
+    };
+  </script>
+
+  <!-- PARTICLES + AMBIENT BLOBS -->
+  <div id="particles-js"><canvas class="particles-js-canvas-el"></canvas></div>
+  <div class="ambient-light"><div class="blob blob-1"></div><div class="blob blob-2"></div></div>
+
+  <!-- SVG central (chat) - RESTORED OBJECT TAG -->
+  <div class="svg-container" style="z-index:3">
+    <object data="3D_logo_Dual_Infodose_9.svg" type="image/svg+xml"></object>
+  </div>
+
+  <!-- TOP INFO (chat) -->
+  <div class="top-info" id="topInfo" style="z-index:5">
+    <span id="displayUser">User: —</span> · <span id="displayInfodose">Infodose: —</span>
+  </div>
+
+  <!-- RESPONSE container (chat) -->
+  <div class="response-container" id="response" style="z-index:4">
+    <div class="page initial active">
+      <strong>Clique no ◉ e diga “Oi, Dual”.</strong><br>
+      <em>Sempre único. Sempre seu.</em>
+    </div>
+
+    <div class="response-controls">
+      <div class="control-buttons">
+        <button class="control-btn copy-button" title="Copiar tudo">
+          <svg viewBox="0 0 24 24" width="20" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+        </button>
+        <button class="control-btn paste-button" title="Colar">
+           <svg viewBox="0 0 24 24" width="20" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+        </button>
+        <button id="toggleBtn" class="control-btn toggle-button" title="Painel Infodose">
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" fill="none" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        </button>
+        <button id="crystalBtn" class="control-btn" title="Cristalizados">
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" fill="none" stroke-width="2"><path d="M12 2l2.9 6.3L21 10l-5 3.6L17.8 21 12 17.7 6.2 21 7 13.6 2 10l6.1-1.7L12 2z"></path></svg>
+        </button>
+        <button id="settingsBtn" class="control-btn" title="Configurações">
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" fill="none" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        </button>
+      </div>
+
+      <div class="pagination">
+        <button data-action="prev">⟵</button>
+        <span id="pageIndicator">1 / 1</span>
+        <button data-action="next">⟶</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- INPUT (chat) -->
+  <div class="input-container" style="z-index:5">
+    <input id="userInput" type="text" placeholder="Diga: 'oi, Dual'...">
+    <button id="sendBtn" title="Enviar">➤</button>
+    <button id="voiceBtn" title="Falar">
+      <!-- RESTORED OBJECT TAG -->
+      <object data="Reset_buttom_Dual-Infodose.svg" type="image/svg+xml" width="36" height="36" style="pointer-events: none;"></object>
+    </button>
+  </div>
+
+  <!-- Settings Modal (chat) -->
+  <div id="settingsModal" class="modal">
+    <div class="box">
+      <h3>Configuração Neural</h3>
+      <div class="col">
+        <div class="input-group">
+          <label>OpenRouter API Key (SK)</label>
+          <input type="password" id="apiKeyInput" placeholder="sk-or-..." autocomplete="off">
+        </div>
+        <div class="input-group">
+          <label>Modelo AI</label>
+          <input type="text" id="modelInput" placeholder="ex: meta-llama/llama-3.1-405b-instruct:free">
+        </div>
+        <div class="settings-actions">
+          <button id="cancelSettings" class="btn btn-sec">Cancelar</button>
+          <button id="saveSettings" class="btn btn-prim">Salvar Conexão</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toggle Panel (chat) -->
+  <div id="togglePanel" class="panel">
+    <div class="box">
+      <h3>Painel Infodose</h3>
+      <div class="row">
+        <div style="flex:1" class="col">
+          <label class="small">Usuário</label>
+          <input type="text" id="userNameInput" placeholder="Seu nome..." />
+        </div>
+        <div style="flex:1" class="col">
+          <label class="small">Nome da Infodose</label>
+          <input type="text" id="infodoseNameInput" placeholder="Ex: World System — Alpha" />
+        </div>
+      </div>
+
+      <div style="margin-top:10px" class="col">
+        <label class="small">Treinamento (World System) — Upload / Export</label>
+        <input type="file" id="trainingUpload" accept=".txt" />
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button id="importTrainingBtn" class="btn btn-sec">Importar (ler)</button>
+          <button id="exportTrainingBtn" class="btn btn-prim">Exportar treino</button>
+        </div>
+        <div id="trainingFileName" class="small" style="margin-top:6px;color:#9bd">Nenhum arquivo carregado</div>
+      </div>
+
+      <div style="margin-top:12px; display:flex; gap:8px; align-items:center;">
+        <label class="small" style="flex:1">Infodose ativa</label>
+        <input type="checkbox" id="assistantActiveCheckbox" />
+        <label class="small" style="flex:1">Treinamento ativo</label>
+        <input type="checkbox" id="trainingActiveCheckbox" />
+      </div>
+
+      <div style="margin-top:12px; display:flex; gap:8px;">
+        <button id="savePanelBtn" class="btn btn-prim">Salvar Painel</button>
+        <button id="closePanelBtn" class="btn btn-sec">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Crystal modal (chat) -->
+  <div id="crystalModal" class="modal">
+    <div class="box">
+      <h3>Cristalizados</h3>
+      <div class="row" style="margin-bottom:8px">
+        <button id="exportAllCrystal" class="btn btn-prim">Exportar todos</button>
+        <button id="clearAllCrystal" class="btn btn-sec">Limpar tudo</button>
+      </div>
+      <div class="crystal-list" id="crystalList"></div>
+      <div style="margin-top:12px;display:flex;justify-content:flex-end;gap:8px">
+        <button id="closeCrystal" class="btn btn-sec">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MANTRA FOOTER -->
+  <div id="mantra-toggle" style="z-index:5">
+    <span id="mantra-text">
+      Do seu jeito. <strong>Sempre</strong> único. <strong>Sempre</strong> seu.
+    </span>
+  </div>
+
+  <!-- Fusion HUD Card -->
+  <div class="container">
+    <div class="fusion-card closed" id="mainCard" role="application" aria-label="Fusion HUD">
+      <div class="card-header" id="cardHeader">
+        <div class="avatar-slot" id="avatarTarget" title="Gerenciar Chaves"></div>
+        <div class="text-block">
+          <div class="greeting-row">
+            <span class="txt-thin" id="lblHello">Oi,</span>
+            <span class="txt-heavy" id="lblName">Convidado</span>
+          </div>
+          <div class="brand-dual">DUAL</div>
+        </div>
+        <div class="clock-widget">
+          <div class="time-display" id="clockTime" style="font-family: var(--font-code); color:var(--neon-cyan);">00:00</div>
+          <span class="status-led" style="font-size:0.6rem; letter-spacing:1px; color:rgba(255,255,255,0.4)">ONLINE</span>
+        </div>
+      </div>
+
+      <div class="small-preview" id="smallPreview" title="Gerenciar Chaves">
+        <div class="mini-avatar" id="smallMiniAvatar"></div>
+        <div class="small-text" id="smallText">Aguardando ativação...</div>
+        <div class="ident-badge" id="smallIdent">--</div>
+      </div>
+
+      <div class="card-body" id="cardBody">
+        <div class="input-wrapper stagger-item">
+          <input type="text" class="cyber-input" id="inputUser" placeholder="Identifique-se..." autocomplete="off" />
+        </div>
+
+        <div class="activation-wrap stagger-item">
+          <div class="activation-toggle" onclick="toggleActivation()">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="width:10px;height:10px;border-radius:99px;background:var(--neon-cyan)"></div>
+              <strong style="letter-spacing:1px;font-size:0.9rem">Ativação ASCII</strong>
+            </div>
+            <div style="margin-left:auto;font-size:0.82rem;color:rgba(255,255,255,0.6)">BASE v1</div>
+          </div>
+          <div id="activationCard" class="activation-card activation-hidden">
+            <div style="display:flex;align-items:flex-start;gap:10px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <div class="mini-avatar" id="actMiniAvatar"></div>
+                <div><div style="font-weight:700">CÉREBRO</div><div style="font-size:0.78rem;opacity:0.6"><span id="actName">User</span></div></div>
+              </div>
+              <div class="activation-badge" id="actBadge" style="margin-left:auto; font-size:0.7rem; color: #888;">v:--</div>
+            </div>
+            <pre id="actPre" class="activation-pre">Carregando...</pre>
+            <div class="activation-controls">
+              <button class="trigger-btn" id="copyActBtn">COPIAR</button>
+              <button class="trigger-btn" id="downloadActBtn">PNG</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="stagger-item">
+          <div class="stats-grid">
+            <div class="stat-box"><span class="stat-lbl">LATÊNCIA</span><span class="stat-val">12ms</span></div>
+            <div class="stat-box"><span class="stat-lbl">SEGURANÇA</span><span class="stat-val" id="securityStatus">ABERTO</span></div>
+            <div class="stat-box"><span class="stat-lbl">RITMO</span><span class="stat-val">BETA</span></div>
+          </div>
+          <div class="progress-container" style="margin-top:12px">
+            <div class="bar-meta"><span>CICLO DIÁRIO</span><span id="cyclePercent">0%</span></div>
+            <div class="bar-track"><div class="bar-fill" id="cycleFill"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toaster -->
+  <div class="toaster-wrap" id="toasterWrap"></div>
+
+  <!-- Keys Modal (fusion) -->
+  <div id="keysModal" class="modal-overlay" aria-hidden="true">
+    <div class="keys-card" role="dialog">
+      <div class="keys-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div>
+          <div id="keysTitle" style="font-weight:800;font-size:1.1rem;color:var(--neon-cyan)">USER KEYS MANAGER</div>
+          <div style="color:rgba(255,255,255,0.6);font-size:0.85rem">Gerencie suas ESK Keys com segurança local.</div>
+        </div>
+        <button id="closeKeysBtn" class="small-btn">X</button>
+      </div>
+
+      <div class="key-list" id="keyList"></div>
+
+      <div class="form-section">
+        <div class="form-grid">
+          <input id="keyNameInput" placeholder="Nome da chave (ex: Principal)" />
+          <input id="keyTokenInput" type="password" placeholder="Token / ESK (Opcional)" />
+        </div>
+        <div class="form-row">
+          <input id="keyWebhookInput" placeholder="Webhook URL (https://...)" style="flex:1" />
+          <button id="testWebhookBtn
