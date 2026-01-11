@@ -1,7 +1,7 @@
 {
   "name": "dual.Infodose",
-  "short_name": "Dual💊Infodose",
-  "start_url": "/",
+  "short_name": "Dual.💊Infodose",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "transparent",
   "theme_color": "transparent",
