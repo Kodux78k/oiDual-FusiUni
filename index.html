@@ -21,6 +21,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
 
+
   <style>
     /* ====== Combined variables & base ====== */
     :root{
@@ -38,13 +39,17 @@
 
     *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;outline:none;user-select:none}
     html,body{height:100%;min-height:100vh}
+    
     body{
       font-family:var(--font-ui); color:var(--text-dark);
-      background: var(--bg-dark);
+      /* CORREÇÃO DO FUNDO BRANCO: Definindo cor base preta e empilhando os backgrounds corretamente */
+      background-color: #000;
       background-image:
         linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
-      background-size:50px 50px;
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px),
+        var(--bg-dark); /* O gradiente escuro fica por baixo da grade */
+      background-size: 50px 50px, 50px 50px, 100% 100%;
+      background-attachment: fixed;
       padding:20px; overflow:hidden; display:flex; flex-direction:column; align-items:center;
     }
 
@@ -195,9 +200,9 @@
     }
     .fusion-card.active{opacity:1;transform:translateY(0) scale(1);}
     
-    /* CORREÇÃO DO CARD "MINIFICADO" (CLOSED) */
+    /* CORREÇÃO DO CARD "MINIFICADO" (CLOSED) - Removendo altura extra */
     .fusion-card.closed{width:260px; padding:14px 16px; border-radius:22px;}
-    .fusion-card.closed .card-body { display: none; } /* Remove espaço extra vertical */
+    .fusion-card.closed .card-body { display: none; } /* Oculta corpo para evitar espaço vazio */
 
     .fusion-card.orb{ position: fixed !important; width: 68px !important; height: 68px !important; padding:0 !important; border-radius:50% !important; align-items:center; justify-content:center; box-shadow:0 15px 40px rgba(0,0,0,0.6), 0 0 20px rgba(0,242,255,0.2); z-index:9999; cursor:grab }
     .fusion-card.hud{ position: fixed !important; top: 12px !important; left: 50% !important; transform: translateX(-50%) !important; width: 92% !important; max-width:600px !important; height:64px !important; padding:0 16px !important; border-radius:99px !important; flex-direction:row; align-items:center; justify-content:space-between; box-shadow:0 10px 30px rgba(0,0,0,0.5); z-index:9999; }
@@ -1653,4 +1658,5 @@
 
 </body>
 </html>
+
 
